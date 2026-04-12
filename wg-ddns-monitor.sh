@@ -5,33 +5,40 @@ WG_INTERFACE="wg0"
 DDNS_HOST="change.me.ddns.net"
 LOG_FILE="/var/log/wireguard-ddns-monitor.log"
 LOCK_FILE="/var/run/wireguard-ddns-monitor.lock"
+RESOLVER="1.1.1.1" # DNS server used to resolve DDNS_HOST.
+LOG_LEVEL="ALL"    # "ALL" (info + errors) or "ERROR" (errors only)
 
-# Function to log with timestamp
+# Log function
 log() {
-    echo "$(date '+%d-%m-%Y %H:%M:%S') - $1" >> "$LOG_FILE"
+    local level=$1
+    local message=$2
+    
+    if [ "$LOG_LEVEL" = "ERROR" ] && [ "$level" = "INFO" ]; then
+        return
+    fi
+    
+    echo "$(date '+%d-%m-%Y %H:%M:%S') [$level] - $message" >> "$LOG_FILE"
 }
 
-# Check for root privileges
+# Require root
 if [ "$EUID" -ne 0 ]; then 
-    echo "Error: This script must be run as root."
+    echo "Error: Must run as root."
     exit 1
 fi
 
 # Check dependencies
 for cmd in dig wg systemctl; do
     if ! command -v $cmd &> /dev/null; then
-        log "ERROR: Required command '$cmd' not found."
+        log "ERROR" "Missing command: $cmd"
         exit 1
     fi
 done
 
 # Prevent multiple instances
 if [ -f "$LOCK_FILE" ]; then
-    # Check if process is actually running
     if kill -0 $(cat "$LOCK_FILE" 2>/dev/null) 2>/dev/null; then
         exit 0
     else
-        # Stale lock file
         rm -f "$LOCK_FILE"
     fi
 fi
@@ -39,23 +46,22 @@ fi
 echo $$ > "$LOCK_FILE"
 trap "rm -f $LOCK_FILE" EXIT
 
-# Get current DNS resolution
-current_ip=$(dig +short "$DDNS_HOST" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | tail -n1)
+# Resolve IP using external DNS
+current_ip=$(dig @"$RESOLVER" +short "$DDNS_HOST" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | tail -n1)
 
 if [ -z "$current_ip" ]; then
-    log "ERROR: Could not resolve $DDNS_HOST"
+    log "ERROR" "Could not resolve $DDNS_HOST via $RESOLVER"
     exit 1
 fi
 
-# Check if any peer has this IP as endpoint
+# Verify endpoint and restart if needed
 if ! wg show "$WG_INTERFACE" endpoints | grep -q "$current_ip"; then
-    log "IP $current_ip not found in peer endpoints, restarting WireGuard..."
-    systemctl restart wg-quick@"$WG_INTERFACE"
-    if [ $? -eq 0 ]; then
-        log "WireGuard restarted successfully"
+    log "INFO" "Endpoint mismatch. Restarting WireGuard..."
+    if systemctl restart wg-quick@"$WG_INTERFACE"; then
+        log "INFO" "WireGuard restarted successfully."
     else
-        log "ERROR: Failed to restart WireGuard"
+        log "ERROR" "Failed to restart WireGuard."
     fi
 else
-    log "IP $current_ip matches current peer endpoint, no restart needed"
+    log "INFO" "Endpoint matches $current_ip. No action needed."
 fi
