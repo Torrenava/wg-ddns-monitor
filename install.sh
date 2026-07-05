@@ -166,24 +166,20 @@ if [ ! -f "$SCRIPT_SRC" ]; then
     exit 1
 fi
 
-MISSING_DEPS=()
-command -v dig &>/dev/null || MISSING_DEPS+=("dnsutils (dig)")
-command -v wg &>/dev/null || MISSING_DEPS+=("wireguard-tools (wg)")
-command -v systemctl &>/dev/null || MISSING_DEPS+=("systemd (systemctl)")
+MISSING_PKGS=()
+command -v dig &>/dev/null      || MISSING_PKGS+=("dnsutils")
+command -v wg &>/dev/null       || MISSING_PKGS+=("wireguard-tools")
+command -v systemctl &>/dev/null || warn "systemd (systemctl) is required but must be part of the OS."
 
-if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
+if [ ${#MISSING_PKGS[@]} -gt 0 ]; then
     echo ""
-    warn "The following dependencies appear to be missing:"
-    for dep in "${MISSING_DEPS[@]}"; do
-        echo "  - $dep"
-    done
-    if [ "$INTERACTIVE" = true ]; then
-        read -r -p "Continue anyway? [y/N]: " cont
-        if [[ ! "$cont" =~ ^[Yy]$ ]]; then
-            echo "Installation cancelled."
-            exit 1
-        fi
-    fi
+    warn "Missing packages: ${MISSING_PKGS[*]}"
+    echo ""
+    echo "Please install them and re-run this installer:"
+    echo ""
+    echo "  sudo apt-get update && sudo apt-get install -y ${MISSING_PKGS[*]}"
+    echo ""
+    exit 1
 fi
 
 # ---- Install ----
