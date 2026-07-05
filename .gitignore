@@ -1,0 +1,6 @@
+# Agent / AI artifacts
+.agents/
+.agents/**
+skills-lock.json
+.opencode/
+.opencode/**

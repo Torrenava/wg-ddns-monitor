@@ -1,12 +1,18 @@
 #!/bin/bash
 
-# Configuration
+# Default configuration (overridable via /etc/wg-ddns-monitor.conf)
 WG_INTERFACE="wg0"
 DDNS_HOST="change.me.ddns.net"
 LOG_FILE="/var/log/wireguard-ddns-monitor.log"
 LOCK_FILE="/var/run/wireguard-ddns-monitor.lock"
-RESOLVER="1.1.1.1" # DNS server used to resolve DDNS_HOST.
-LOG_LEVEL="ALL"    # "ALL" (info + errors) or "ERROR" (errors only)
+RESOLVER="1.1.1.1"
+LOG_LEVEL="ALL"
+
+# Source external config file if present
+CONFIG_FILE="/etc/wg-ddns-monitor.conf"
+if [ -f "$CONFIG_FILE" ]; then
+    . "$CONFIG_FILE"
+fi
 
 # Log function
 log() {
@@ -17,7 +23,10 @@ log() {
         return
     fi
     
-    echo "$(date '+%d-%m-%Y %H:%M:%S') [$level] - $message" >> "$LOG_FILE"
+    local log_entry
+    log_entry="$(date '+%d-%m-%Y %H:%M:%S') [$level] - $message"
+    echo "$log_entry" >> "$LOG_FILE"
+    echo "$log_entry"
 }
 
 # Require root

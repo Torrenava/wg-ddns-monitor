@@ -1,0 +1,10 @@
+[Unit]
+Description=WireGuard DDNS Monitor Timer
+Requires=wg-ddns-monitor.service
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=2min
+
+[Install]
+WantedBy=timers.target

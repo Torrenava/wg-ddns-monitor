@@ -1,0 +1,2 @@
+# WireGuard DDNS Monitor - checks every 2 minutes
+*/2 * * * * root /usr/local/bin/wg-ddns-monitor.sh
